@@ -1,0 +1,233 @@
+---
+title: "Modeling and prediction for movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+library(grid)
+library(gridExtra)
+```
+
+### Load data
+
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+The data set is comprised of 651 randomly sampled movies produced and released before 2016. It includes information from Rotten Tomatoes and IMDB for a random sample of movies. Each row (651 rows in total) corresponds to some specific movie, whereas 32 columns hold information about various features of movies such as title, genre, runtime etc.
+
+### Generabizability 
+
+As random sampling strategy is deployed in this study, the results can be generalized to the all movies produced and released before 2016. However, there is voluntary response bias in variables related to the ranking of the movies due to the fact that rankings are compiled based on responses of users registered on IMDB and Rotten Tomatoes and voted for those movies.
+
+### Causality
+
+Due to observational nature of the study no causal relationship could be made from data.
+
+* * *
+
+## Part 2: Research question
+The objective of the study is to learn what attributes make a movie popular and make a prediction on popularity of the movies based on constructed model.
+
+Based on available data, IMDB ranking should be a reasonable indicator of popularity of the movie. Therefore IMDB rating will be chosen as a response variable. Whereas, there could be a lot of variables affecting the popularity of the movie, based on available data and subjective opinion following variables are chosen to be explanatary variables that are going to be used to predict the movie popularity: 
+
+* genre (genre of the movie)
+* runtime (runtime of the movie), 
+* imdb_num_votes (Number of votes on IMDB), 
+* critics_score (score given by critics), 
+* audience_score (audience score on Rotten Tomatoes), 
+* best_pic_nom (Whether or not the movie was nominated for a best picture (Oscar) (no, yes)), 
+* best_pic_win (Whether or not the movie won a best picture (Oscar) (no, yes)), 
+* best_actor_win (Whether or not one of the main actors in the movie ever won an Oscar (no, yes)), 
+* best_actress win (Whether or not one of the main actresses in the movie ever won an Oscar (no, yes)), 
+* best_dir_win (Whether or not the director of the movie ever won an Oscar (no, yes) ), 
+* top200_box (Whether or not the movie is in the Top 200 Box Office list on BoxOfficeMojo (no, yes))
+
+
+
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+A good step before we start EDA and modelling is to subset data to include only the required variables, remove the observations with missing data (NA values) and present summary of the dataframe.
+```{r}
+movies_subset <- movies %>% select (imdb_rating, genre,runtime, studio, imdb_num_votes, critics_score, audience_score, best_pic_nom, best_pic_win, best_actor_win, best_actress_win, best_dir_win, top200_box)
+
+movies_subset <- na.omit(movies_subset)
+summary(movies_subset)
+```
+It is useful to visualize the distribution of values of response variable and presents its summary statistics.
+```{r}
+ggplot(movies_subset, aes(x = imdb_rating)) + geom_histogram() + xlab("IMDB rating") + ylab("Count") + ggtitle("Histogram of IMDB rating")
+
+```
+```{r}
+summary(movies_subset$imdb_rating)
+```
+According to histogram, the distribution of IMDB ratings is slightly left skewed with mean of 6.5. The sample dataset has quite large range of values between 1.9 and 9.0.
+
+Next, we will look at the distribution of numerical explanatory variables.
+```{r}
+p1<-ggplot(data=movies , aes(x=runtime)) + geom_histogram(fill ="#c0392b") + ggtitle("Runtime of movies") + theme(axis.title.x=element_blank())
+p2<-ggplot(data=movies_subset , aes(x=imdb_num_votes)) + geom_histogram(fill ="#c0392b") + ggtitle("Number of votes on IMDB") + theme(axis.title.x=element_blank())
+p3<-ggplot(data=movies , aes(x=critics_score)) + geom_histogram(fill ="#c0392b") + ggtitle("Critics score of movies") + theme(axis.title.x=element_blank())
+p4<-ggplot(data=movies_subset , aes(x=audience_score)) + geom_histogram(fill ="#c0392b") + ggtitle("Audience score of movies") + theme(axis.title.x=element_blank())
+grid.arrange(p1, p2, p3, p4, nrow=2)
+```
+
+Based on 4 histograms shown above, we may observe the following:
+
+1. Runtime of the movies is approximately normally distributed with a mean value of around 100 minutes
+2. Number of votes on IMDB for movies is strongly right skewed (most movies got less than 250 000 votes)
+3. The distribution of scores given by critics is approximately uniform
+4. The distribution of scores given by audience is left skewed with mean around 62
+
+
+Now we can observe the distribution of categorical variables
+```{r}
+p5<-ggplot(data=movies , aes(x=best_pic_nom )) + geom_bar(color = "blue") + ggtitle("Whether or not the movie was nominated for a best picture Oscar") +
+theme(axis.title.x=element_blank(), plot.title = element_text(size=7))
+p6<-ggplot(data=movies , aes(x=best_pic_win )) + geom_bar(color = "blue") + ggtitle("Whether or not the movie won a best picture Oscar") +
+theme(axis.title.x=element_blank(), plot.title = element_text(size=7))
+p7<-ggplot(data=movies , aes(x=best_actor_win )) + geom_bar(color = "blue") + ggtitle(" Whether or not one of the main actors won an Oscar ") +
+theme(axis.title.x=element_blank(), plot.title = element_text(size=7))
+p8<-ggplot(data=movies , aes(x=best_actress_win )) + geom_bar(color = "blue") + ggtitle(" Whether or not one of the main actresses won an Oscar ") +
+theme(axis.title.x=element_blank(), plot.title = element_text(size=7))
+p9<-ggplot(data=movies , aes(x=best_dir_win )) + geom_bar(color = "blue") + ggtitle(" Whether or not the director of the movie won an Oscar ") +
+theme(axis.title.x=element_blank(), plot.title = element_text(size=7))
+p10<-ggplot(data=movies , aes(x=top200_box)) + geom_bar(color = "blue") + ggtitle(" Whether or not the movie is in the Top 200 Box Office list ") +
+theme(axis.title.x=element_blank(), plot.title = element_text(size=7))
+grid.arrange(p5, p6, p7, p8, p9, p10 ,nrow=3)
+
+```
+```{r}
+ggplot(data=movies, aes(x=genre)) + geom_bar(fill="blue") + ggtitle("Genre of movies") + theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0))
+```
+
+
+
+Based on 7 bar charts shown above, we may observe the following:
+* Most of the movies in sample have not nominated or received best picture Oscar
+* Main actor and actresses and directors of the movies have not ever won an Oscar
+* Very small number of the movies was included in Top 200 box office list
+* Large fraction of the movies in our samples fall into Drama genre
+
+* * *
+
+## Part 4: Modeling
+
+We are going to model IMDB rating of the movie based on 11 explanatory variables specified in research question. We have chosen to eliminate some categorical variables with many distinct levels (title,actor 1 through 5, imdb url, rt url, director, studio) due to the fact that no two of the movies have the same value for these categorical variables and there will be no contribution of these variables when predicting the IMDB ratings. Some of the variables were thought to be irrelevant in deciding the popularity of the movie such as title_type ,thtr_rel_year, thtr_rel_month, thtr_rel_day, dvd_rel_year, dvd_rel_month, dvd_rel_day. Moreover, some variables (mpaa_rating, critics_rating, audience_rating) were considered to be colliniear with other predictors included in the model and therefore they are also not included to the model. Therefore, we will start our modeling with full model including 11 explanatory variables and use backward elimination method based on p-values due to large number of explanatory variables present.
+```{r}
+movies_model1 = lm(imdb_rating ~ genre + runtime+ imdb_num_votes + critics_score + audience_score + best_pic_nom+best_pic_win+ best_actor_win + best_actress_win + best_dir_win + top200_box , data = movies)
+summary(movies_model1)
+```
+Next step in backward elimination method based on p-value is to drop the variable with the highest p-value above 0.05 threshold that represents the rate of insignificancy the predictor. Therefore at this step we drop variable best_pic_win
+
+```{r}
+movies_model2 = lm(imdb_rating ~ genre + runtime+ imdb_num_votes + critics_score + audience_score + best_pic_nom + best_actor_win + best_actress_win + best_dir_win + top200_box , data = movies)
+summary(movies_model2)
+```
+Next we drop best_dir_win variable
+
+```{r}
+movies_model3 = lm(imdb_rating ~ genre + runtime+ imdb_num_votes + critics_score + audience_score + best_pic_nom + best_actor_win + best_actress_win + top200_box , data = movies)
+summary(movies_model3)
+```
+
+Next we drop best_actor_win variable
+
+```{r}
+movies_model4 = lm(imdb_rating ~ genre + runtime+ imdb_num_votes + critics_score + audience_score + best_pic_nom  + best_actress_win + top200_box , data = movies)
+summary(movies_model4)
+```
+
+Next we drop best_pic_nom variable
+```{r}
+movies_model5 = lm(imdb_rating ~ genre + runtime+ imdb_num_votes + critics_score + audience_score  + best_actress_win + top200_box , data = movies)
+summary(movies_model5)
+```
+
+Next we drop best_actress_win variable
+```{r}
+movies_model6 = lm(imdb_rating ~ genre + runtime+ imdb_num_votes + critics_score + audience_score  + top200_box , data = movies)
+summary(movies_model6)
+```
+Next we drop top200_box variable
+```{r}
+movies_model7 = lm(imdb_rating ~ genre + runtime+ imdb_num_votes + critics_score + audience_score , data = movies)
+summary(movies_model7)
+```
+Finally we end up with model, where we do not have any insignificant predictors. Moreover, while we we got very minor improvement in the value of adjusted R-squared (from 0.8203 in initial model to 0.821 in final model) we significantly simplified the model and left with the variables that contribute to the popularity of the movie.
+
+### Model diagnostics
+```{r}
+plot(movies_model7)
+```
+
+```{r}
+hist(movies_model7$residuals)
+```
+
+1. Linearity is checked with using scatter plot of residuals versus predicted values. Points appear to be approximately normally distributed, therefore linearity conditions is met.
+2. Normal distribution of residuals. Histogram of residuals and normal QQ plot is used to check this condition. Normality condition is violated at lower end but at medium and high values it follows the ideal path.
+3. Equal variance of residuals. This assumption is checked with using scatter plot of residuals versus predicted values. Except some outliers in lower end, overall there is not any obvious change in values of residuals with the increase in predicted values (no fan-shape). Therefore, this requirement has also met.
+
+### Interpretation of model coefficients
+```{r}
+summary(movies_model7)
+```
+In the final model we are left with 5 variables, namely genre, runtime, imdb_num_votes, critics_score, audience_score.
+
+1. Base level of genre variable is movies under genre Action & Adventure, so their coefficient is 0. Movies under all other genres have negative coefficients, which means that Action & Advenure movies received the highest Imdb ratings.
+
+2. Runtime variable has a positive slope of 3.928e-03, which means with 1 minute increase in runtime on average we get 3.928e-03 higher IMDB rating.
+
+3. Imdb_num_votes variable has a positive slope of 8.203e-07, which means with every 10 million increase in number of votes  on average we get 8.203 higher IMDB rating.
+
+4. Critics_score variable has a positive slope of 1.026e-02, which means with every 100 point increase in critics score  on average we get 1.026 higher IMDB rating.
+
+5. Audience_score variable has a positive slope of 3.241e-02, which means with every 100 point increase in critics score  on average we get 3.241 higher IMDB rating.
+
+* * *
+
+## Part 5: Prediction
+Here we will use our model to predict the IMDB rating of the movie "Up", which was released in 2009. First we should get the data to input for our predictor variables (genre, runtime, imdb_num_votes, critics_score, audience_score). The data for the 1st 3 variables can be accessed from  https://www.imdb.com/title/tt1049413/, while for the latter 2 variables from https://www.rottentomatoes.com/m/up/.
+
+We create a new dataframe to hold the data for the new movie:
+```{r}
+data_up <- data.frame(genre="Action & Adventure", runtime=96, imdb_num_votes=802486, critics_score=98, audience_score=90)
+```
+
+Next, we make a prediction about IMDB score of "Up" with our model.
+```{r}
+predict(movies_model7, data_up, interval = "confidence")
+```
+Thus, we get a predicted value of 8.287441 for our new movie, while the bounds of confidence interval is between 8.007988 and 8.566894. The actual IMDB rating of "Up" is 8.3. Therefore, we got pretty accurate prediction our movie, which serves as a good validation of our model. One additional fact to mention is that, the range for our confidence interval is reasonably small (around 0.56) which is also an indicator of a good model characteristics.
+
+* * *
+
+## Part 6: Conclusion
+
+In summary, it is shown that we can predict an IMDB rating of the movie based on its genre, runtime, number of votes on IMDB, audience and critics score. We got high adjusted R-squared value (0.82), which adds high credibility to the predictive capacity of our model.
+
+The predictive capacity of the model could further be improved by coming up with new statistically significant features that will contribute to the predictive ability of the model for deduction of popularity of the movie.
+
